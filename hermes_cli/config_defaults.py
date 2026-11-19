@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- APNs settings and its secret must be registered in the canonical data registries.
 """Default configuration data for Hermes Agent: DEFAULT_CONFIG and OPTIONAL_ENV_VARS.
 
 Pure-data leaf module — must not import from hermes_cli.config. Comments are the user-facing
@@ -20,6 +21,8 @@ LEGACY_VERCEL_RUNTIME = "node24"  # the seeded pre-49 default, never a user choi
 
 
 DEFAULT_CONFIG = {
+    "push": {"apns": {"team_id": "", "key_id": "", "key_path": "", "bundle_id": "",
+                       "environment": "production"}},
     "model": "",
     "providers": {},
     "fallback_providers": [],
@@ -2674,6 +2677,8 @@ from hermes_cli.config_defaults_env import OptionalEnvVars, _base_url, _env, _ms
 # checklists; category: provider|tool|skill|messaging|setting, advanced=True hides from checklists,
 # tools=[...] lists the model tools the key unlocks. Provider entries: config_provider_env (on first read).
 OPTIONAL_ENV_VARS = OptionalEnvVars({
+    "APNS_AUTH_KEY": _env("APNs .p8 signing key content", "APNs signing key", password=True,
+                          category="setting", advanced=True),
     # ── Provider (handled in provider selection, not shown in checklists) ──
     "NOUS_BASE_URL": _base_url("Nous Portal"),
     "HERMES_ANON_API_SECRET": _env(

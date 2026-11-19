@@ -106,6 +106,10 @@ def _publish_completion(authority, live, ref, row, settled, response, captured):
         # line, Desktop toast), so a turn the owner's stop cut short says why (#134889 F1).
         complete['warning'] = notice
     live.event_stream.publish(ref.session_id, complete)
+    from hermes_cli.push_notifications import notify_reply
+    notify_reply(authority.profile_id, getattr(live.source, 'user_id', None), ref.session_id,
+                 None, {**complete, 'error': ((captured or {}).get('result') or {}).get('error')},
+                 attached=bool(live.subscribers))
 
 
 RESTART_INTERRUPT_NOTICE = ('Gateway restarting: this turn was interrupted and will not be run again. '

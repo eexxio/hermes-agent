@@ -2307,7 +2307,7 @@ dependencies = [
     { name = "fire" },
     { name = "firecrawl-anydoc" },
     { name = "httptools" },
-    { name = "httpx", extra = ["socks"] },
+    { name = "httpx", extra = ["http2", "socks"] },
     { name = "jinja2" },
     { name = "markdown" },
     { name = "nemo-relay", marker = "(platform_machine == 'aarch64' and 'android' not in platform_release and sys_platform == 'linux') or (platform_machine == 'x86_64' and 'android' not in platform_release and sys_platform == 'linux') or (platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'AMD64' and sys_platform == 'win32') or (platform_machine == 'ARM64' and sys_platform == 'win32')" },
@@ -2674,7 +2674,7 @@ requires-dist = [
     { name = "hermes-agent", extras = ["youtube"], marker = "extra == 'all'" },
     { name = "httplib2", marker = "extra == 'google'", specifier = "==0.32.0" },
     { name = "httptools", marker = "python_full_version >= '3.14'", specifier = ">=0.6.3,<0.9" },
-    { name = "httpx", extras = ["socks"], marker = "python_full_version >= '3.14'", specifier = "==0.28.1" },
+    { name = "httpx", extras = ["socks", "http2"], marker = "python_full_version >= '3.14'", specifier = "==0.28.1" },
     { name = "httpx2", marker = "extra == 'computer-use'", specifier = "==2.15.1" },
     { name = "httpx2", marker = "extra == 'mcp'", specifier = "==2.15.1" },
     { name = "huggingface-hub", marker = "extra == 'trace-upload'", specifier = "==1.33.0" },
@@ -2926,6 +2926,9 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+http2 = [
+    { name = "h2" },
+]
 socks = [
     { name = "socksio" },
 ]

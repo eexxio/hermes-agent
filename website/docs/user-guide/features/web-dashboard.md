@@ -12,6 +12,39 @@ The web dashboard is a browser-based UI for managing your Hermes Agent installat
 Hosted-mode auth uses Nous Portal OAuth; if you also want the dashboard to talk to a real backend, `hermes setup --portal` wires up the model and tool gateway too. See [Nous Portal](../../integrations/nous-portal.md).
 :::
 
+## iOS reply notifications
+
+iOS clients such as Orbit can register an APNs device token with authenticated
+`POST /api/push/register` (`{"token":"<hex token>","platform":"ios","bundle_id":"com.example.orbit"}`)
+and remove it with `POST /api/push/unregister` (`{"token":"<hex token>"}`). Both accept the
+dashboard's usual authentication and optional `?profile=name` selector. Registration is
+idempotent and stored in that profile's `push_devices.db`. All dashboard logins act as
+the machine owner, matching session ownership; messaging users are not implicitly that owner.
+
+To enable alerts, configure the **owning profile's** `config.yaml`:
+
+```yaml
+push:
+  apns:
+    team_id: YOUR_APPLE_TEAM_ID
+    key_id: YOUR_APNS_KEY_ID
+    key_path: /secure/path/AuthKey.p8
+    bundle_id: com.example.orbit
+    environment: production # or sandbox for development builds
+```
+
+Alternatively, keep the secret `.p8` content in `APNS_AUTH_KEY` in the profile's `.env`.
+`APNS_TEAM_ID`, `APNS_KEY_ID`, and `APNS_KEY_PATH` are compatibility environment fallbacks;
+prefer YAML for these non-secret settings. Relative key paths resolve under the profile home.
+Missing or incomplete configuration leaves push off without preventing registration.
+
+After a turn completes or fails, Hermes sends an alert only if that session has no attached
+viewer. Alerts include up to 200 characters of the reply/error, the session title (or `Hermes`),
+and custom `session_id`, `title`, `preview`, and `status` (`complete` or `error`) fields.
+This sends reply previews to Apple; configure APNs only if that is appropriate for your data.
+Only registrations matching the configured bundle ID receive alerts. APNs-invalid or
+unregistered tokens are removed automatically. Stopped/interrupted turns do not alert.
+
 ## Quick Start
 
 ```bash

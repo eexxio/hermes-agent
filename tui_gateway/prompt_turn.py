@@ -1049,6 +1049,9 @@ def _recover_turn_exception(sid: str, session: dict, st: _TurnRun, e: BaseExcept
     try:
         # Same terminal error frame shape as the returned-error path.
         _emit_terminal_turn_error(sid, session, e, retire_marker=st.receipt_committed)
+        if st.terminal_callback is None:
+            from hermes_cli.push_notifications import notify_standalone_reply
+            notify_standalone_reply(sid, session, {"status": "error", "error": str(e)})
         st.error_retained = True
         st.error_detail = _turn_failure_detail(e, error_type_name(e), st.prompt_text)
     except Exception as emit_exc:
@@ -1213,6 +1216,9 @@ def _run_prompt_submit(
                 from tui_gateway.free_tier_task_done import note_task_done
                 note_task_done(session, st.result, st.agent, display_kind)
             _emit("message.complete", sid, payload)
+            if st.terminal_callback is None:
+                from hermes_cli.push_notifications import notify_standalone_reply
+                notify_standalone_reply(sid, session, payload)
             goal_followup = _goal_followup_after_turn(sid, session, st.result, status, raw)
             if status == "complete":
                 _after_complete_turn(sid, session, st, raw)
