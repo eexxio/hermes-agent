@@ -23,6 +23,7 @@ from persistence.core.errors import AuthorityRefusal
 
 def handlers(connection):
     return {'session.save': partial(save_session, connection),
+            'session.undo': partial(undo_session, connection),
             'session.export': partial(export_session, connection),
             'reload.env': partial(reload_env, connection),
             'delegation.pause': partial(pause_delegation, connection),
@@ -53,6 +54,26 @@ def _live_ref(connection, ref, params, fields, capability):
         raise AuthorityRefusal('invalid_params')
     authorize(connection, ref, params, capability)
     return connection.authority.sessions[ref.session_id]
+
+
+async def undo_session(connection, ref, params):
+    """Rewind conversation only; /retry omits the advisory filesystem rollback hint."""
+    _live_ref(connection, ref, params, {'session_id', 'profile', 'intent'}, 'session:control')
+    if params.get('intent') not in (None, 'undo', 'retry'):
+        raise AuthorityRefusal('invalid_params')
+    if connection.authority._handle(ref).execution_state != 'idle':
+        raise AuthorityRefusal('session_busy')
+    receipt = await _rewind_last_turn(connection, ref)
+    result = {'removed': int(receipt.get('rewound_count') or 0)}
+    if result['removed'] and params.get('intent') != 'retry':
+        target = receipt['target_message']
+        if target.get('timestamp') is not None:
+            listed = await rollback(connection, ref, {
+                'session_id': ref.session_id, 'undo_since': target['timestamp'],
+                'undo_message_id': target['id']}, kind='list')
+            if hint := listed.get('undo_hint'):
+                result['undo_hint'] = hint
+    return result
 
 
 async def save_session(connection, ref, params):
@@ -308,7 +329,8 @@ async def rollback(connection, ref, params, *, kind):
     taken = []
     result = await asyncio.to_thread(run)
     if kind == 'restore' and result.get('success') and not file_path:
-        result['history_removed'] = await _rewind_last_turn(connection, ref, taken[0] if taken else None)
+        receipt = await _rewind_last_turn(connection, ref, taken[0] if taken else None)
+        result['history_removed'] = int(receipt.get('rewound_count') or 0)
     return result
 
 
@@ -349,9 +371,10 @@ def _fit_frame(text, budget):
 
 async def _rewind_last_turn(connection, ref, taken=None):
     """Drop the newest user turn and everything after it (main's full ``/rollback`` restore) via the
-    owner's revision-fenced ``rewind`` mutation; 0 when the transcript has no user turn, or when that turn
+    owner's revision-fenced ``rewind`` mutation; an empty receipt when there is no user turn, or that turn
     ended before the checkpoint taken at ``taken`` (``/undo`` already removed the turn that made it)."""
     authority = connection.authority
+    handle = authority._handle(ref)
     from session_rules.turns import user_originated_turn_view
     from gateway.session_local_recovery import local_history
     from agent.checkpoints.undo_hint import rollback_rewinds_newest_turn
@@ -359,11 +382,10 @@ async def _rewind_last_turn(connection, ref, taken=None):
     users = [i for i, row in enumerate(rows) if isinstance(row.get('row_id'), int)
              and user_originated_turn_view(row) is not None]
     if not users or not rollback_rewinds_newest_turn(rows, users, taken):
-        return 0
+        return {}
     target = rows[users[-1]]['row_id']
     from gateway.session_mutations import mutate_session
     from persistence.core.errors import MUTATION_GUARD_REFUSALS
-    handle = authority._handle(ref)
     try:
         result = await mutate_session(authority, connection.actor, ref, {
             'session_id': ref.session_id, 'request_id': f'rollback:{uuid.uuid4().hex}',
@@ -371,4 +393,4 @@ async def _rewind_last_turn(connection, ref, taken=None):
             'operation': 'rewind', 'payload': {'target_message_id': target}})
     except MUTATION_GUARD_REFUSALS as exc:
         raise AuthorityRefusal('session_busy') from exc
-    return int(result.get('rewound_count') or 0)
+    return result
